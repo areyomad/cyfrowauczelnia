@@ -3,10 +3,11 @@ services:
   db:
     image: mysql:latest
     environment:
-      - MYSQL_DATABASE=cyfrowauczelnia
-      - MYSQL_USER=studentadmin
-      - MYSQL_PASSWORD=mypassword
-      - MYSQL_ALLOW_EMPTY_PASSWORD=1
+      - SQLSRV_DATABASE=cyfrowauczelnia
+      - SQLSRV_USER=studentadmin
+      - SQLSRV_SA_PASSWORD=mypassword
+      - SQLSRV_ALLOW_EMPTY_PASSWORD=1
+    
     volumes:
       - "./db:/docker-entrypoint-initdb.d"
 

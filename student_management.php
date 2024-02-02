@@ -4,8 +4,6 @@ $database = 'cyfrowauczelnia';
 $username = 'studentadmin';
 $password = 'mypassword';
 
-$connect = mysqli_connect($host, $username, $password, $database);
-
 $conn = sqlsrv_connect($host, array("UID" => $username, "PWD" => $password, "Database" => $database));
 
 if ($conn === false) {
