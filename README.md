@@ -1,5 +1,9 @@
 # cyfrowauczelnia
-
+Nazwa: Cyfrowa Uczelnia
+Temat: Baza danych studentów, przyjazda do użytkowania dla pracowników
+Autorzy:
+Paweł Goleń 39945
+Cyprian Winter 39950
 
 Instrukcje Uruchomienia Projektu z Użyciem Docker
 Ten projekt korzysta z Docker i docker-compose do uruchomienia środowiska deweloperskiego, które obejmuje aplikację PHP i bazę danych SQL Server.
