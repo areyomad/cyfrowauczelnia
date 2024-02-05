@@ -1,23 +1,20 @@
 <?php
-$host = 'db'; # nazwa usługi bazy danych w Docker Compose
+$host = 'db'; 
 $database = 'cyfrowauczelnia';
 $username = 'studentadmin';
 $password = 'mypassword';
 
-$conn = sqlsrv_connect($host, array("UID" => $username, "PWD" => $password, "Database" => $database));
 
-if ($conn === false) {
-    $errors = sqlsrv_errors();
-    $errorMessages = [];
-    foreach($errors as $error) {
-        $errorMessages[] = "SQLSTATE: " . $error['SQLSTATE'] . " Code: " . $error['code'] . " Message: " . $error['message'];
-    }
-    die("Błąd połączenia z bazą danych: " . implode(" | ", $errorMessages));
+$connect = mysqli_connect($host, $username, $password, $database);
+
+
+if (!$connect) {
+    die("Błąd połączenia z bazą danych: " . mysqli_connect_error());
 }
 
 
 function dodajStudenta($studentData) {
-    global $conn;
+    global $connect;
 
     $albumNumber = $studentData['album_number'];
     $firstName = $studentData['first_name'];
@@ -26,91 +23,85 @@ function dodajStudenta($studentData) {
     $phone = $studentData['phone'];
 
     $query = "INSERT INTO students (album_number, first_name, last_name, email, phone) VALUES (?, ?, ?, ?, ?)";
-    $params = array($albumNumber, $firstName, $lastName, $email, $phone);
 
-    $stmt = sqlsrv_query($conn, $query, $params);
+    $stmt = mysqli_prepare($connect, $query);
+    mysqli_stmt_bind_param($stmt, "sssss", $albumNumber, $firstName, $lastName, $email, $phone);
+    mysqli_stmt_execute($stmt);
 
-    if ($stmt) {
+    if (mysqli_stmt_affected_rows($stmt) > 0) {
         echo "Student został pomyślnie dodany.";
+        echo "<a href='student_management.php' class='edit-btn'>Wróć do listy studentów</a>";
     } else {
-        echo "Błąd podczas dodawania studenta: " . sqlsrv_errors();
+        echo "Błąd podczas dodawania studenta: " . mysqli_error($connect);
     }
+    mysqli_stmt_close($stmt);
 }
 
 function usunStudenta($studentId) {
-    global $conn;
+    global $connect;
 
     $query = "DELETE FROM students WHERE id = ?";
-    $params = array($studentId);
 
-    $stmt = sqlsrv_query($conn, $query, $params);
+    $stmt = mysqli_prepare($connect, $query);
+    mysqli_stmt_bind_param($stmt, "i", $studentId);
+    mysqli_stmt_execute($stmt);
 
-    if ($stmt) {
+    if (mysqli_stmt_affected_rows($stmt) > 0) {
         echo "Student został pomyślnie usunięty.";
+        echo "<a href='student_management.php' class='edit-btn'>Wróć do listy studentów</a>";
     } else {
-        echo "Błąd podczas usuwania studenta: " . sqlsrv_errors();
+        echo "Błąd podczas usuwania studenta: " . mysqli_error($connect);
     }
+    mysqli_stmt_close($stmt);
 }
 
-function pobierzStudentow($search_query = null) {
-    global $conn;
 
-    $students = array();
-    if ($search_query) {
-        $query = "SELECT * FROM students WHERE album_number LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR email LIKE ? OR phone LIKE ?";
-        $params = array("%$search_query%", "%$search_query%", "%$search_query%", "%$search_query%", "%$search_query%");
-    } else {
-        $query = "SELECT * FROM students";
-        $params = array();
-    }
+function pobierzStudentow() {
+    global $connect;
 
-    $stmt = sqlsrv_query($conn, $query, $params);
-
-    if ($stmt !== false) {
-        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-            $students[] = $row;
-        }
-    }
+    $query = "SELECT * FROM students";
+    $result = mysqli_query($connect, $query);
+    $students = mysqli_fetch_all($result, MYSQLI_ASSOC);
 
     return $students;
 }
 
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["addStudent"])) {
-    if (!empty($_POST['album_number']) && !empty($_POST['first_name']) && !empty($_POST['last_name']) && !empty($_POST['email']) && !empty($_POST['phone'])) {
-        $studentData = array(
-            'album_number' => $_POST['album_number'],
-            'first_name' => $_POST['first_name'],
-            'last_name' => $_POST['last_name'],
-            'email' => $_POST['email'],
-            'phone' => $_POST['phone']
-        );
 
-        dodajStudenta($studentData);
-        header("Location: student_management.php");
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    if (isset($_POST["addStudent"])) {
+        if (!empty($_POST['album_number']) && !empty($_POST['first_name']) && !empty($_POST['last_name']) && !empty($_POST['email']) && !empty($_POST['phone'])) {
+            $studentData = array(
+                'album_number' => $_POST['album_number'],
+                'first_name' => $_POST['first_name'],
+                'last_name' => $_POST['last_name'],
+                'email' => $_POST['email'],
+                'phone' => $_POST['phone']
+            );
+
+            dodajStudenta($studentData);
+            exit;
+        }
+    } elseif (isset($_POST["deleteStudent"])) {
+        $studentId = $_POST['student_id'];
+        usunStudenta($studentId);
         exit;
     }
 }
 
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["deleteStudent"])) {
-    $studentId = $_POST['student_id'];
-    usunStudenta($studentId);
-    header("Location: student_management.php");
-    exit;
-}
-
-$search_query = isset($_GET['search']) ? $_GET['search'] : null;
-$students = pobierzStudentow($search_query);
+$students = pobierzStudentow();
 ?>
+
 
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Cyfrowa Uczelnia</title>
+<title>Cyfrowa Uczelnia - Zarządzanie Studentami</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 20px;
+            background-color: #f4f4f4;
         }
 
         h1 {
@@ -119,6 +110,9 @@ $students = pobierzStudentow($search_query);
 
         form {
             margin-bottom: 20px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
         }
 
         label {
@@ -127,22 +121,40 @@ $students = pobierzStudentow($search_query);
         }
 
         input[type="text"],
-        input[type="email"] {
-            width: 300px;
-            padding: 5px;
+        input[type="email"],
+        input[type="submit"],
+        input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0 20px 0;
+            display: inline-block;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
         }
 
         input[type="submit"] {
-            padding: 10px 20px;
+            width: auto;
             background-color: #4CAF50;
-            color: #fff;
-            border: none;
+            color: white;
             cursor: pointer;
+            border: none;
+        }
+
+        input[type="submit"]:hover {
+            background-color: #45a049;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
+            margin-top: 20px;
         }
 
         th, td {
@@ -153,8 +165,47 @@ $students = pobierzStudentow($search_query);
 
         th {
             background-color: #4CAF50;
-            color: #fff;
+            color: white;
         }
+
+        .edit-btn, .delete-btn {
+    text-decoration: none;
+    padding: 6px 12px;
+    color: white;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    display: inline-block;
+    margin: 0 2px;
+    font-size: 14px;
+}
+
+.edit-btn {
+    background-color: #4CAF50;
+}
+
+.delete-btn {
+    background-color: #d9534f;
+}
+
+
+form.inline {
+    display: inline-block;
+    margin: 0;
+    padding: 0;
+}
+
+
+form.inline:before {
+    content: " ";
+    display: inline-block;
+}
+
+
+.edit-btn:hover, .delete-btn:hover {
+    opacity: 0.8;
+}
+
     </style>
 </head>
 <body>
@@ -187,12 +238,9 @@ $students = pobierzStudentow($search_query);
         <input type="submit" name="deleteStudent" value="Usuń studenta">
     </form>
 
-    <h1>Wyszukaj studenta</h1>
-<form action="student_management.php" method="get">
-    <label for="search">Wpisz szukaną frazę (imię, nazwisko, numer albumu, email, telefon):</label>
-    <input type="text" name="search" id="search">
-    <input type="submit" value="Szukaj">
-</form>
+    <h1>Dodaj studenta</h1>
+<input type="text" id="searchQuery" onkeyup="searchStudents()" placeholder="Wpisz dane do wyszukiwania...">
+
 
     <h1>Lista studentów</h1>
     <?php
@@ -204,15 +252,19 @@ $students = pobierzStudentow($search_query);
 
         foreach ($students as $student) {
             echo "<tr>";
-            echo "<td>" . $student['id'] . "</td>";
-            echo "<td>" . $student['album_number'] . "</td>";
-            echo "<td>" . $student['first_name'] . "</td>";
-            echo "<td>" . $student['last_name'] . "</td>";
-            echo "<td>" . $student['email'] . "</td>";
-            echo "<td>" . $student['phone'] . "</td>";
+            echo "<td>" . htmlspecialchars($student['id']) . "</td>";
+            echo "<td>" . htmlspecialchars($student['album_number']) . "</td>";
+            echo "<td>" . htmlspecialchars($student['first_name']) . "</td>";
+            echo "<td>" . htmlspecialchars($student['last_name']) . "</td>";
+            echo "<td>" . htmlspecialchars($student['email']) . "</td>";
+            echo "<td>" . htmlspecialchars($student['phone']) . "</td>";
             echo "<td>";
-            echo "<a class='edit-btn' href='edit_student.php?id=" . $student['id'] . "'>Edytuj</a>";
-            echo "<a class='delete-btn' href='student_management.php?deleteStudent=1&student_id=" . $student['id'] . "'>Usuń</a>";
+
+            echo "<a class='edit-btn' href='edit_student.php?id=" . ($student['id']) . "'>Edytuj</a>";
+            echo "<form class='inline' method='post' action='student_management.php' onsubmit='return confirm(\"Czy na pewno chcesz usunąć tego studenta?\");'>";
+            echo "<input type='hidden' name='student_id' value='" . ($student['id']) . "'>";
+            echo "<input type='submit' name='deleteStudent' value='Usuń' class='delete-btn'>";
+            echo "</form>";
             echo "</td>";
             echo "</tr>";
         }
@@ -223,6 +275,22 @@ $students = pobierzStudentow($search_query);
     }
     ?>
 
+<script>
+function searchStudents() {
+    var input = document.getElementById("searchQuery");
+    var filter = input.value.toLowerCase();
+    var nodes = document.getElementsByTagName('tr');
+
+    for (i = 1; i < nodes.length; i++) { 
+        if (nodes[i].textContent.toLowerCase().includes(filter)) {
+            nodes[i].style.display = "";
+        } else {
+            nodes[i].style.display = "none";
+        }
+    }
+}
+</script>
+
+
 </body>
 </html>
-
